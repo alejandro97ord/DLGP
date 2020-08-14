@@ -1,30 +1,7 @@
 
 clear all;close all;%clc
 % opengl('save','software')
-select = 3;
-if select == 1
-    fileName = "Real_Sarcos";
-    load('C:\Users\alejandro\Desktop\P10\rt-learning-with-dlgp\benchmarks\data\Real_Sarcos.mat')
-elseif select == 2
-    fileName = "Real_Barrett";
-elseif select == 3
-    fileName = "Real_Sarcos_long";
-    load('C:\Users\alejandro\Desktop\P10\rt-learning-with-dlgp\benchmarks\data\Real_Sarcos_long.mat')
-elseif select == 4
-    fileName = "SL_Sarcos";
-elseif select == 5
-    fileName = "SL_Barrett";
-elseif select == 6
-    fileName = "2DoFData_large";
-    load('C:\Users\alejandro\Desktop\P10\rt-learning-with-dlgp\benchmarks\data\2DoFData_large.mat')
-elseif select == 7
-    fileName = "KUKA_flask";
-end
-
-%dataset and hyperparameters in the same folder.
-if ~ exist('X_train','var') || ~ exist('Y_train','var')
-    load(fileName)
-end
+datasetSelect;
 rng(0)
 inputSize =size(X_train,2);
 amountDoF = size(Y_train,2);

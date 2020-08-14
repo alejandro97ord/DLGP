@@ -1,14 +1,16 @@
 %gp01 = mDLGP(xSize,pts,N);
 tic
-gp01 = mDLGP(inputSize,100,1000);
+gp01 = mDLGP;
 
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
-gp01.wo = 20; %overlapping factor
+gp01.wo = 300; %overlapping factor
 
 %data loaded from hyp.
 gp01.sigmaF = sigf(DoF); 
 gp01.sigmaN = sign(DoF);
 gp01.lengthS = ls(:,DoF);
+
+gp01.init(inputSize,50,10000);
 
 %initialize GP
 disp('initialized')
@@ -22,9 +24,9 @@ for j = 0:Nsteps-1
     t_update(DoF,j+1) = toc/ave;
     tic;
     for d = 1: size(X_test,1)
-%         output(d)=gp01.predictL(X_test(d,:)');
+        output(d)=gp01.predict(X_test(d,:)');
 %         [output(d),outvar(d)]=gp01.predictL(X_test(d,:)');
-        [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
+%         [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
     end
     oVar(DoF,j+1) = mean(outvar);
     Nll(DoF,j+1) = mean(negll);

@@ -1,4 +1,4 @@
-classdef mDLGP <handle
+classdef mDLGPM <handle
     %
     %{
     Data limit per GP: amount of data in a GP that triggers a division
@@ -28,6 +28,7 @@ classdef mDLGP <handle
         sigmaN = 1; %sigma_N
         divMethod = 3; %Hyperplane method
         wo = 100; %Ratio Width/overlapping
+        outs = 1;
     end
     
     properties%(Access = protected)
@@ -59,11 +60,11 @@ classdef mDLGP <handle
             obj.count = 1;
             
             obj.X = zeros(obj.xSize, obj.pts * obj.N);
-            obj.Y = zeros(1, obj.pts * obj.N);
-            obj.K = zeros(obj.pts, obj.pts * obj.N);
-            obj.alpha = zeros(obj.pts,obj.N);
-            obj.auxAlpha = zeros(obj.pts, obj.N);
-            obj.L = zeros(obj.pts, obj.pts * obj.N);
+            obj.Y = zeros(obj.outs, obj.pts * obj.N);%
+            obj.K = zeros(obj.pts*obj.outs, obj.pts * obj.N);%
+            obj.alpha = zeros(obj.pts*obj.outs,obj.N);%
+            obj.auxAlpha = zeros(obj.pts*obj.outs, obj.N);%
+            obj.L = zeros(obj.pts*obj.outs, obj.pts * obj.N);%
             obj.localCount = zeros(1,2* obj.N -1);
             
             obj.medians =  zeros(obj.xSize, 2*obj.N-1);
@@ -77,8 +78,8 @@ classdef mDLGP <handle
             obj.auxUbic(1,1) = 1;
         end
         
-        function kern = kernel(obj, Xi, Xj)%squared exponential kernel
-            kern = (obj.sigmaF^2)*exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS.^2),1))';
+        function kern = kernel(obj, Xi, Xj,outNum)%squared exponential kernel
+            kern = (obj.sigmaF(outNum)^2)*exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS(:,outNum).^2),1))';
         end
         
         function m = mValue(obj, model,cutD)%compute the hyperplane
@@ -102,40 +103,46 @@ classdef mDLGP <handle
         function updateParam(obj,x,model)
             pos = obj.auxUbic(model)-1;
             if obj.localCount(model) == 1 %first point in model
-                lH = chol(obj.kernel(x, x) + obj.sigmaN.^2);
-                obj.K(1,(pos)*obj.pts+1) = obj.kernel(x, x) + obj.sigmaN.^2;
-                obj.L(1,(pos)*obj.pts+1) = lH;
-                obj.alpha(1,pos+1) = lH'\(lH\obj.Y((pos)*obj.pts+1));
-                obj.auxAlpha(1,pos+1) = (lH\obj.Y((pos)*obj.pts+1));
+                for p = 0:obj.outs-1
+                    lH = chol(obj.kernel(x, x, p+1) + obj.sigmaN(p+1).^2);
+                    obj.K(p*obj.pts+1,(pos)*obj.pts+1) = obj.kernel(x, x, p+1) + obj.sigmaN(p+1).^2;
+                    obj.L(p*obj.pts+1,(pos)*obj.pts+1) = lH;
+                    obj.alpha(p*obj.pts+1,pos+1) = lH'\(lH\obj.Y((pos)*obj.pts+1));
+                    obj.auxAlpha(p*obj.pts+1,pos+1) = (lH\obj.Y((pos)*obj.pts+1));
+                end
             else
                 %set the updated parameters
                 %auxX does not consider the new point x
                 %auxY does consider the new point y
                 auxX =  obj.X(:,(pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model)-1);
-                auxY =  obj.Y((pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model));
-                b = obj.kernel(auxX,x);
-                c = obj.kernel(x,x)+obj.sigmaN^2;
-                auxL = obj.L(1:obj.localCount(model)-1,...
-                    (pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model)-1);
-                newL = [auxL zeros(obj.localCount(model)-1,1); (auxL\b)' sqrt(c - norm(auxL\b)^2)];
-                obj.K(1:obj.localCount(model), (pos)*obj.pts+1:...
-                    (pos)*obj.pts+obj.localCount(model)) = [obj.K(1:obj.localCount(model)-1,...
-                    (pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model)-1),...
-                    b;b',c];
-                obj.L(1:obj.localCount(model), (pos)*obj.pts+1:...
-                    (pos)*obj.pts+obj.localCount(model)) = newL;
-                
-                obj.auxAlpha(obj.localCount(model),pos+1) = (auxY(obj.localCount(model))-...
-                    newL(end,1:end-1)*obj.auxAlpha(1:obj.localCount(model)-1,pos+1))/...
-                    newL(end,end);
-                obj.alpha(1:obj.localCount(model),pos+1) = newL'\(obj.auxAlpha(1:obj.localCount(model),pos+1));
+                auxY =  obj.Y(:,(pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model));
+                for p = 0:obj.outs-1
+                    b = obj.kernel(auxX,x,p+1);
+                    c = obj.kernel(x,x,p+1)+obj.sigmaN(p+1)^2;
+                    auxOut = p*obj.pts+1;
+                    auxL = obj.L(auxOut:auxOut+obj.localCount(model)-2,...
+                        (pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model)-1);
+                    newL = [auxL zeros(obj.localCount(model)-1,1); (auxL\b)' sqrt(c - norm(auxL\b)^2)];
+                    obj.K(auxOut:auxOut+obj.localCount(model)-1, (pos)*obj.pts+1:...
+                        (pos)*obj.pts+obj.localCount(model)) = [obj.K(auxOut:auxOut+obj.localCount(model)-2,...
+                        (pos)*obj.pts+1:(pos)*obj.pts+obj.localCount(model)-1),...
+                        b;b',c];
+                    obj.L(auxOut:auxOut+obj.localCount(model)-1, (pos)*obj.pts+1:...
+                        (pos)*obj.pts+obj.localCount(model)) = newL;
+                    
+                    obj.auxAlpha(auxOut+obj.localCount(model)-1,pos+1) = (auxY(p+1,obj.localCount(model))-...
+                        newL(end,1:end-1)*obj.auxAlpha(auxOut:auxOut+obj.localCount(model)-2,pos+1))/...
+                        newL(end,end);
+                    obj.alpha(auxOut:auxOut+obj.localCount(model)-1,pos+1) =...
+                        newL'\(obj.auxAlpha(auxOut:auxOut+obj.localCount(model)-1,pos+1));
+                end
             end
         end
         
         function addPoint(obj, x, y, model)
             if obj.localCount(model) < obj.pts %if the model is not full
                 obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1+obj.localCount(model)) = x;
-                obj.Y((obj.auxUbic(model)-1)*obj.pts+1+obj.localCount(model)) = y;
+                obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+1+obj.localCount(model)) = y;
                 obj.localCount(model) = obj.localCount(model) + 1;
                 obj.updateParam(x,model)
             end
@@ -177,8 +184,8 @@ classdef mDLGP <handle
                 
                 xL = zeros(obj.xSize,obj.pts); %matrix with x values for the left model
                 xR = zeros(obj.xSize,obj.pts); %matrix with x values for the right model
-                yL = zeros(1,obj.pts); %vector with y values for the left model
-                yR = zeros(1,obj.pts); %vector with y values for the left model
+                yL = zeros(obj.outs,obj.pts); %vector with y values for the left model
+                yR = zeros(obj.outs,obj.pts); %vector with y values for the right model
                 
                 lcount = 0;
                 rcount = 0;
@@ -190,25 +197,25 @@ classdef mDLGP <handle
                     if xD<mP-o/2 %if in left set
                         lcount = lcount+1;
                         xL(:,lcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                        yL(lcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                        yL(:,lcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                         iL(lcount) = i;
                     elseif xD >= mP-o/2 && xD <= mP+o/2 %if in overlapping
                         pL = 0.5 + (xD-mP)/(o);
                         if pL>=rand() %select left side
                             lcount = lcount+1;
                             xL(:,lcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                            yL(lcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                            yL(:,lcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                             iL(lcount) = i;
                         else
                             rcount = rcount + 1;
                             xR(:,rcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                            yR(rcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                            yR(:,rcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                             iR(rcount) = i;
                         end
                     elseif xD>mP+o/2 %if in right
                         rcount = rcount + 1;
                         xR(:,rcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                        yR(rcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                        yR(:,rcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                         iR(rcount) = i;
                     end
                 end
@@ -261,32 +268,47 @@ classdef mDLGP <handle
                 else %update alpha and  L values for the new models
                     B = (1:obj.pts);
                     C = [iL(1:lcount),iR(1:rcount)];
-                    newK = obj.K(1:end, (obj.auxUbic(model)-1)*obj.pts+1:...
-                        (obj.auxUbic(model)-1)*obj.pts+obj.pts);
-                    %permute K:
-                    newK(B,:) =  newK(C,:);
-                    newK(:,B) = newK(:,C);
-                    %compute child L factors
-                    lL = chol(newK(1:lcount,1:lcount),'lower');
-                    rL = chol(newK(lcount+1:end,lcount+1:end),'lower');
                     
-                    obj.K(1:lcount,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = newK(1:lcount,1:lcount);
-                    obj.K(1:rcount,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = newK(lcount+1:end,lcount+1:end);
+                    for i =0:obj.outs-1
+                        newK = obj.K( i*obj.pts+1:(i+1)*obj.pts ...
+                            , (obj.auxUbic(model)-1)*obj.pts+1:...
+                            (obj.auxUbic(model)-1)*obj.pts+obj.pts);
+                        %permute K:
+                        newK(B,:) =  newK(C,:);
+                        newK(:,B) = newK(:,C);
+                        %compute child L factors
+                        lL = chol(newK(1:lcount,1:lcount),'lower');
+                        rL = chol(newK(lcount+1:end,lcount+1:end),'lower');
+                        
+                        obj.K(i*obj.pts+1:i*obj.pts+lcount...
+                            ,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = newK(1:lcount,1:lcount);
+                        obj.K(i*obj.pts+1:i*obj.pts+rcount...
+                            ,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = newK(lcount+1:end,lcount+1:end);
+                        
+                        obj.L(i*obj.pts+1:i*obj.pts+lcount...
+                            ,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = lL;
+                        obj.L(i*obj.pts+1:i*obj.pts+rcount...
+                            ,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = rL;
+                        %compute child alphas
+                        obj.auxAlpha(i*obj.pts+1:i*obj.pts+lcount...
+                            , obj.auxUbic(obj.count)) = lL\yL(i+1,1:lcount)';
+                        obj.auxAlpha(i*obj.pts+1:i*obj.pts+rcount...
+                            , obj.auxUbic(obj.count+1)) = rL\yR(i+1,1:rcount)';
+                        
+                        obj.alpha(i*obj.pts+1:i*obj.pts+lcount...
+                            , obj.auxUbic(obj.count)) = lL'\...
+                            obj.auxAlpha(i*obj.pts+1:i*obj.pts+lcount...
+                            , obj.auxUbic(obj.count));
+                        obj.alpha(i*obj.pts+1:i*obj.pts+rcount...
+                            , obj.auxUbic(obj.count+1)) = rL'\...
+                            obj.auxAlpha(i*obj.pts+1:i*obj.pts+rcount...
+                            , obj.auxUbic(obj.count+1));
+                    end
                     
-                    obj.L(1:lcount,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = lL;
-                    obj.L(1:rcount,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = rL;
-                    %compute child alphas
-                    obj.auxAlpha(1:lcount, obj.auxUbic(obj.count)) = lL\yL(1:lcount)';
-                    obj.auxAlpha(1:rcount, obj.auxUbic(obj.count+1)) = rL\yR(1:rcount)';
-                    
-                    obj.alpha(1:lcount, obj.auxUbic(obj.count)) = lL'\(obj.auxAlpha(1:...
-                        lcount, obj.auxUbic(obj.count)));
-                    obj.alpha(1:rcount, obj.auxUbic(obj.count+1)) = rL'\(obj.auxAlpha(1:...
-                        rcount, obj.auxUbic(obj.count+1)));
                     div = -1; %stop the divide loop
                     childModel = -1;
                 end
@@ -295,9 +317,9 @@ classdef mDLGP <handle
                     (obj.auxUbic(obj.count)-1)*obj.pts+obj.pts) = xL;
                 obj.X(:, (obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
                     (obj.auxUbic(obj.count+1)-1)*obj.pts+obj.pts) = xR;
-                obj.Y((obj.auxUbic(obj.count)-1)*obj.pts+1:...
+                obj.Y(:,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
                     (obj.auxUbic(obj.count)-1)*obj.pts+obj.pts) = yL;
-                obj.Y((obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
+                obj.Y(:,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
                     (obj.auxUbic(obj.count+1)-1)*obj.pts+obj.pts) = yR;
                 obj.auxUbic(model) = 0; %parent model will not have data
             end
@@ -338,6 +360,7 @@ classdef mDLGP <handle
         end
         
         function out = predict(obj,x)
+            out = zeros(obj.outs,1);
             moP = zeros(2,1000);% line 1: active GPs, line 2: global probability
             mCount = 1; %number of GPs used for predictions
             moP(1,1) = 1; %start in root
@@ -362,14 +385,16 @@ classdef mDLGP <handle
                     end
                 end
             end
-            out = 0;
             %prediction: weigthing prediction with proabilities
-            for i=1:mCount
-                model = moP(1,i);
-                pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x) )' * ...
-                    obj.alpha(1:obj.localCount(model),obj.auxUbic(model));
-                out = out+pred*moP(2,i);
+            for p = 0:obj.outs-1
+                for i=1:mCount
+                    model = moP(1,i);
+                    pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, p+1) )' * ...
+                        obj.alpha(p*obj.pts+1: p*obj.pts+obj.localCount(model)...
+                        ,obj.auxUbic(model));
+                    out(p+1) = out(p+1)+pred*moP(2,i);
+                end
             end
         end
         

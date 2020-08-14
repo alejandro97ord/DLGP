@@ -3,7 +3,6 @@ clear all;close all;clc
 % opengl('save','software')
 fileName = "KUKA_flask";
 
-
 %dataset and hyperparameters in the same folder.
 if ~ exist('X_train','var') || ~ exist('Y_train','var')
     load('C:\Users\alejandro\Desktop\P10\rt-learning-with-dlgp\benchmarks\data\KUKA_flask.mat')
