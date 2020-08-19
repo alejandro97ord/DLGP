@@ -423,23 +423,27 @@ classdef mDLGPM <handle
                     end
                 end
             end
-            out = 0;
-            outVar = 0;
+            out = zeros(obj.outs,1);
+            outVar = zeros(obj.outs,1);
             %prediction: weigthing prediction and variance with proabilities
-            for i=1:mCount
-                model = moP(1,i);
-                pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x) )' * ...
-                    obj.alpha(1:obj.localCount(model),obj.auxUbic(model));
-                
-                v = obj.L(1:obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model))\...
-                    obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x);
-                outVar= outVar + ((obj.kernel(x,x)-v'*v)+pred^2)*moP(2,i);
-                out = out+pred*moP(2,i);
+            for p = 0:obj.outs-1
+                for i=1:mCount
+                    model = moP(1,i);
+                    pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, p+1) )' * ...
+                        obj.alpha(p*obj.pts+1: p*obj.pts+obj.localCount(model)...
+                        ,obj.auxUbic(model));
+                    out(p+1) = out(p+1)+pred*moP(2,i);
+                    
+                    v = obj.L(p*obj.pts+1:p*obj.pts+obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model))\...
+                        obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x,p+1);
+                    outVar(p+1)= outVar(p+1) + ((obj.kernel(x,x,p+1)-v'*v)+pred^2)*moP(2,i);
+                    
+                end
+                outVar(p+1) = outVar(p+1) - out(p+1)^2;
             end
-            outVar = outVar - out^2;
         end
         
         function [out, outVar,outLik] = predictL(obj,x,yTest)
@@ -465,26 +469,30 @@ classdef mDLGPM <handle
                     end
                 end
             end
-            out = 0;
-            outVar = 0;
-            outLik = 0;
-            for i=1:mCount
-                model = moP(1,i);
-                pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x) )' * ...
-                    obj.alpha(1:obj.localCount(model),obj.auxUbic(model));
-                
-                v = obj.L(1:obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model))\...
-                    obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x);
-                outVar= outVar + ((obj.kernel(x,x)-v'*v)+pred^2)*moP(2,i);
-                prob = normpdf(yTest,pred, sqrt(obj.kernel(x,x)-v'*v + obj.sigmaN^2));
-                outLik = outLik+max(prob,1e-300)*moP(2,i);
-                out = out+pred*moP(2,i);
+            out = zeros(obj.outs,1);
+            outVar = zeros(obj.outs,1);
+            outLik = zeros(obj.outs,1);
+            for p =0:obj.outs-1
+                for i=1:mCount
+                    model = moP(1,i);
+                    pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, p+1) )' * ...
+                        obj.alpha(p*obj.pts+1: p*obj.pts+obj.localCount(model)...
+                        ,obj.auxUbic(model));
+                    out(p+1) = out(p+1)+pred*moP(2,i);
+                    
+                    v = obj.L(p*obj.pts+1:p*obj.pts+obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model))\...
+                        obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x,p+1);
+                    outVar(p+1)= outVar(p+1) + ((obj.kernel(x,x,p+1)-v'*v)+pred^2)*moP(2,i);
+                    
+                    prob = normpdf(yTest(p+1),pred, sqrt(obj.kernel(x,x,p+1)-v'*v + obj.sigmaN(p+1)^2));
+                    outLik(p+1) = outLik(p+1)+max(prob,1e-300)*moP(2,i);
+                end
+                outVar(p+1) = outVar(p+1) - out(p+1)^2;
+                outLik(p+1) = -log(outLik(p+1));
             end
-            outVar = outVar - out^2;
-            outLik = -log(outLik);
         end
     end
 end

@@ -2,6 +2,8 @@
 clear all;close all;
 select =3;
 datasetSelect;
+
+runTime = tic;
 gp01 = mDLGPM;
 
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
@@ -14,7 +16,7 @@ gp01.lengthS = ls;
 gp01.outs = size(Y_train,2);
 
 gp01.init(size(X_train,2),50,10000);
-Nsteps = 1;
+Nsteps = 100;
 Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
 %initialize GP
 d = ['Initialized at : ',datestr(now,'HH.MM.SS')];
@@ -22,6 +24,9 @@ disp(d)
 t_update = zeros(1,100);
 t_pred = zeros(1,100);
 output = zeros(size(Y_train,2),4449);
+outvar = zeros(size(Y_train,2),4449);
+negll = zeros(size(Y_train,2),4449);
+rng(0);
 for j = 0:Nsteps-1
     ave = Ns(j+2)-Ns(j+1); 
     tic;
@@ -32,16 +37,19 @@ for j = 0:Nsteps-1
     
     tic;
     for d = 1: size(X_test,1)
-        output(:,d)=gp01.predict(X_test(d,:)');
-%         [output(d),outvar(d)]=gp01.predictL(X_test(d,:)');
-%         [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
+%         output(:,d)=gp01.predict(X_test(d,:)');
+%         [output(:,d),outvar(:,d)]=gp01.predictV(X_test(d,:)');
+        [output(:,d),outvar(:,d),negll(:,d)]=gp01.predictL(X_test(d,:)',Y_test(d,:));
     end
 %     oVar(DoF,j+1) = mean(outvar);
 %     Nll(DoF,j+1) = mean(negll);
     t_pred(j+1) = toc/size(X_test,1);
 %     error(DoF,j+1) = mean( (output'-Y_test(:,DoF)).^2 )/var(Y_test(:,DoF));
 end
+runTime = toc(runTime);
 error = output' - Y_test;
 disp(mean(error.^2)./var(Y_test));
+disp(mean(outvar,2)');
+disp(mean(negll,2)');
 d = ['Finalized at: ',datestr(now,'HH.MM.SS')];
 disp(d)

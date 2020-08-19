@@ -24,9 +24,9 @@ for j = 0:Nsteps-1
     t_update(DoF,j+1) = toc/ave;
     tic;
     for d = 1: size(X_test,1)
-        output(d)=gp01.predict(X_test(d,:)');
-%         [output(d),outvar(d)]=gp01.predictL(X_test(d,:)');
-%         [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
+%         output(d)=gp01.predict(X_test(d,:)');
+%         [output(d),outvar(d)]=gp01.predictV(X_test(d,:)');
+        [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
     end
     oVar(DoF,j+1) = mean(outvar);
     Nll(DoF,j+1) = mean(negll);
