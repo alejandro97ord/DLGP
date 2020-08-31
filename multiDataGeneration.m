@@ -1,22 +1,23 @@
-
 clear all;close all;
 select =3;
 datasetSelect;
 
 runTime = tic;
-gp01 = mDLGPM;
+gp01 = mDLGPMop;
 
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
-gp01.wo = 300; %overlapping factor
+gp01.wo = 2000; %overlapping factor
 
+Y_train = Y_train(:,1:7);
+Y_test = Y_test(:,1:7);
 %data loaded from hyp.
-gp01.sigmaF = sigf; 
-gp01.sigmaN = sign;
-gp01.lengthS = ls;
+% gp01.sigmaF = sigf; 
+% gp01.sigmaN = sign;
+% gp01.lengthS = ls;
 gp01.outs = size(Y_train,2);
 
-gp01.init(size(X_train,2),50,10000);
-Nsteps = 100;
+gp01.init(size(X_train,2),50,4000);
+Nsteps = 1;
 Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
 %initialize GP
 d = ['Initialized at : ',datestr(now,'HH.MM.SS')];
@@ -53,3 +54,16 @@ disp(mean(outvar,2)');
 disp(mean(negll,2)');
 d = ['Finalized at: ',datestr(now,'HH.MM.SS')];
 disp(d)
+%%
+
+res.K = gp01.K;
+res.X = gp01.X;
+res.Y = gp01.Y;
+res.alpha = gp01.alpha;
+res.invK = gp01.invK;
+res.sigmaN = gp01.sigmaN;
+res.lengthS = gp01.lengthS;
+res.sigmaF = gp01.sigmaF;
+res.dlik0 = gp01.dlik0;
+res.delta = gp01.delta;
+

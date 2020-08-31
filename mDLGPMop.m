@@ -1,4 +1,4 @@
-classdef mDLGPop <handle
+classdef mDLGPMop <handle
     %
     %{
     Data limit per GP: amount of data in a GP that triggers a division
@@ -27,6 +27,7 @@ classdef mDLGPop <handle
         
         divMethod = 3; %Hyperplane method
         wo = 100; %Ratio Width/overlapping
+        outs = 2;
     end
     
     properties%(Access = protected)
@@ -62,10 +63,10 @@ classdef mDLGPop <handle
             obj.count = 1;
             
             obj.X = zeros(obj.xSize, obj.pts * obj.N);
-            obj.Y = zeros(1, obj.pts * obj.N);
-            obj.K = zeros(obj.pts, obj.pts * obj.N);
-            obj.alpha = zeros(obj.pts,obj.N);
-            obj.invK =zeros(obj.pts,obj.pts*obj.N);
+            obj.Y = zeros(obj.outs, obj.pts * obj.N);
+            obj.K = zeros(obj.pts*obj.outs, obj.pts * obj.N);
+            obj.alpha = zeros(obj.pts*obj.outs,obj.N);
+            obj.invK =zeros(obj.pts*obj.outs,obj.pts*obj.N);
             obj.localCount = zeros(1,2* obj.N -1);
             
             obj.medians =  zeros(obj.xSize, 2*obj.N-1);
@@ -78,23 +79,23 @@ classdef mDLGPop <handle
             obj.auxUbic = zeros(1, 2 * obj.N-1);
             obj.auxUbic(1,1) = 1;
             
-            obj.sigmaN = ones(1,obj.N);
-            obj.sigmaF = ones(1,obj.N);
+            obj.sigmaN = ones(obj.outs,obj.N);
+            obj.sigmaF = ones(obj.outs,obj.N);
             
             if obj.ard == 1
-                obj.lengthS = ones(obj.xSize,obj.N);
-                obj.delta = 0.1*ones(obj.xSize+2,obj.N);
-                obj.dlik0 = ones(obj.xSize+2,obj.N);
+                obj.lengthS = ones(obj.xSize*obj.outs,obj.N);
+                obj.delta = 0.1*ones((obj.xSize+2)*obj.outs,obj.N);
+                obj.dlik0 = ones((obj.xSize+2)*obj.outs,obj.N);
             else
-                obj.lengthS = ones(1,obj.N);
-                obj.delta = 0.1*ones(3,obj.N);
-                obj.dlik0 = ones(3,obj.N);
+                obj.lengthS = ones(obj.outs,obj.N);
+                obj.delta = 0.1*ones(3*obj.outs,obj.N);
+                obj.dlik0 = ones(3*obj.outs,obj.N);
             end
         end
         
-        function kern = kernel(obj, Xi, Xj,model)%squared exponential kernel
-            kern = (obj.sigmaF(obj.auxUbic(model))^2)*...
-                exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS(:,obj.auxUbic(model)).^2),1))';
+        function kern = kernel(obj, Xi, Xj,out, model)%squared exponential kernel
+            kern = (obj.sigmaF(out,obj.auxUbic(model))^2)*...
+                exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS((out-1)*obj.xSize+1:out*obj.xSize,obj.auxUbic(model)).^2),1))';
         end
         
         function kern = fkernel(~,Xi,hyp) %kernel of Xi and itself (square matrix)
@@ -133,42 +134,43 @@ classdef mDLGPop <handle
         end
         
         function obj = rprop(obj,model)
-            % get the previous hyperparameters
-            x0 = [obj.sigmaF(obj.auxUbic(model));...
-                obj.sigmaN(obj.auxUbic(model));...
-                obj.lengthS(:,obj.auxUbic(model))];
-            
-            dmax = 50; dmin = 1e-6; etap = 1.2; etam = 0.5;
-            %obtain the previous likelihood
-            
-            %get new hyperparameters and likelohood
-            x1  = x0 + sign (obj.dlik0(:,obj.auxUbic(model))).*...
-                obj.delta(:,obj.auxUbic(model));
-            if abs(x1(2))<0.01
-                x1(2) = sign(x1(2))*0.01;
+            for p = 0:obj.outs-1
+                % get the previous hyperparameters
+                x0 = [obj.sigmaF(p+1,obj.auxUbic(model));...
+                    obj.sigmaN(p+1,obj.auxUbic(model));...
+                    obj.lengthS(p*obj.xSize+1:(p+1)*obj.xSize,obj.auxUbic(model))];
+
+                dmax = 50; dmin = 1e-6; etap = 1.2; etam = 0.5;
+
+                %get new hyperparameters
+                x1  = x0 + sign (obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model))).*...
+                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model));
+                if abs(x1(2))<0.01
+                    x1(2) = sign(x1(2))*0.01;
+                end
+                if abs(x1(1)/x1(2))>1000
+                    x1(1) = sign(x1(1))*x1(2)*1000;
+                end
+                dfx1 = obj.grad(x1,model,p);
+                %update delta and check it fullfils requirements
+                d1 = ((obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)).*dfx1)>0).*...
+                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model))*etap...
+                    + ((obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)).*dfx1)<0).*...
+                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model))*etam ...
+                    + (obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)).*dfx1==0).*...
+                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model));
+                d1 = d1.*(d1>=dmin & d1 <= dmax)+(d1<dmin)*dmin + (d1>dmax)*dmax;
+                %             dfx1 = ((obj.dlik0(:,obj.auxUbic(model)).*dfx1)>=0).*dfx1;
+                %update properties
+                obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)) = dfx1;
+                obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)) = d1;
+                obj.sigmaF(p+1,obj.auxUbic(model)) = x1(1);
+                obj.sigmaN(p+1,obj.auxUbic(model)) = x1(2);
+                obj.lengthS(p*obj.xSize+1:(p+1)*obj.xSize,obj.auxUbic(model)) = x1(3:end);
             end
-            if abs(x1(1)/x1(2))>1000
-                x1(1) = sign(x1(1))*x1(2)*1000;
-            end
-            dfx1 = obj.grad(x1,model);
-            %update delta and check it fullfils requirements
-            d1 = ((obj.dlik0(:,obj.auxUbic(model)).*dfx1)>0).*...
-                obj.delta(:,obj.auxUbic(model))*etap...
-                + ((obj.dlik0(:,obj.auxUbic(model)).*dfx1)<0).*...
-                obj.delta(:,obj.auxUbic(model))*etam ...
-                + (obj.dlik0(:,obj.auxUbic(model)).*dfx1==0).*...
-                obj.delta(:,obj.auxUbic(model));
-            d1 = d1.*(d1>=dmin & d1 <= dmax)+(d1<dmin)*dmin + (d1>dmax)*dmax;
-            %             dfx1 = ((obj.dlik0(:,obj.auxUbic(model)).*dfx1)>=0).*dfx1;
-            %update properties
-            obj.dlik0(:,obj.auxUbic(model)) = dfx1;
-            obj.delta(:,obj.auxUbic(model)) = d1;
-            obj.sigmaF(obj.auxUbic(model)) = x1(1);
-            obj.sigmaN(obj.auxUbic(model)) = x1(2);
-            obj.lengthS(:,obj.auxUbic(model)) = x1(3:end);
         end
         
-        function [ df] = grad(obj,hyps,model)
+        function [ df] = grad(obj,hyps,model,p)
             df = zeros(size(hyps,1),1);
             
             Ki = obj.fkernel(  obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
@@ -176,18 +178,22 @@ classdef mDLGPop <handle
                 hyps  );
             Ki = Ki + (Ki==0)*exp(-725);
             Kn = Ki + eye(size(Ki,1))*hyps(2)^2;
-            obj.K(1:obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
+            obj.K(p*obj.pts+1:p*obj.pts+obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
                 (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model))=Kn;
-            obj.alpha(1:obj.localCount(model),obj.auxUbic(model)) = Kn\obj.Y((obj.auxUbic(model)-1)*obj.pts+1:...
+            obj.alpha(p*obj.pts+1:p*obj.pts+obj.localCount(model),obj.auxUbic(model)) = ...
+                Kn\obj.Y(p+1,(obj.auxUbic(model)-1)*obj.pts+1:...
                 (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model))';
             
-            obj.invK(1:obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
+            obj.invK(p*obj.pts+1:p*obj.pts+obj.localCount(model),...
+                (obj.auxUbic(model)-1)*obj.pts+1:...
                 (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)) = inv(Kn);
             
             %get the value needed in al derivatives
-            auxDer = obj.alpha(1:obj.localCount(model),obj.auxUbic(model))*...
-                obj.alpha(1:obj.localCount(model),obj.auxUbic(model))'-...
-                obj.invK(1:obj.localCount(model),(obj.auxUbic(model)-1)*obj.pts+1:...
+            auxDer = obj.alpha(p*obj.pts+1:p*obj.pts+obj.localCount(model),...
+                obj.auxUbic(model))* obj.alpha(p*obj.pts+1:p*obj.pts+obj.localCount(model),...
+                obj.auxUbic(model))'-...
+                obj.invK(p*obj.pts+1:p*obj.pts+obj.localCount(model),...
+                (obj.auxUbic(model)-1)*obj.pts+1:...
                 (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model));
             
             
@@ -208,10 +214,12 @@ classdef mDLGPop <handle
         
         function updateParam(obj,x,model)
             if obj.localCount(model) == 1 %first point in model
-                pos = obj.auxUbic(model)-1;
-                obj.K(1,(pos)*obj.pts+1) = obj.kernel(x, x, model) + obj.sigmaN(obj.auxUbic(model));
-                obj.invK(1,(pos)*obj.pts+1) = obj.K(1,(pos)*obj.pts+1)^-1;
-                obj.alpha(1,pos+1) = obj.K(1,(pos)*obj.pts+1)\obj.Y((pos)*obj.pts+1);
+                for p = 0:obj.outs-1
+                    pos = obj.auxUbic(model)-1;
+                    obj.K(p*obj.pts+1,(pos)*obj.pts+1) = obj.kernel(x, x, p+1,model) + obj.sigmaN(p+1,obj.auxUbic(model));
+                    obj.invK(p*obj.pts+1,(pos)*obj.pts+1) = obj.K(p*obj.pts+1,(pos)*obj.pts+1)^-1;
+                    obj.alpha(p*obj.pts+1,pos+1) = obj.K(p*obj.pts+1,(pos)*obj.pts+1)\obj.Y(p+1,(pos)*obj.pts+1);
+                end
             end
             %update hyperparameters, K and alpha
             obj.rprop(model);
@@ -220,7 +228,7 @@ classdef mDLGPop <handle
         function addPoint(obj, x, y, model)
             if obj.localCount(model) < obj.pts %if the model is not full
                 obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1+obj.localCount(model)) = x;
-                obj.Y((obj.auxUbic(model)-1)*obj.pts+1+obj.localCount(model)) = y;
+                obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+1+obj.localCount(model)) = y;
                 obj.localCount(model) = obj.localCount(model) + 1;
                 obj.updateParam(x,model)
             end
@@ -262,8 +270,8 @@ classdef mDLGPop <handle
                 
                 xL = zeros(obj.xSize,obj.pts); %matrix with x values for the left model
                 xR = zeros(obj.xSize,obj.pts); %matrix with x values for the right model
-                yL = zeros(1,obj.pts); %vector with y values for the left model
-                yR = zeros(1,obj.pts); %vector with y values for the left model
+                yL = zeros(obj.outs,obj.pts); %vector with y values for the left model
+                yR = zeros(obj.outs,obj.pts); %vector with y values for the left model
                 
                 lcount = 0;
                 rcount = 0;
@@ -275,25 +283,25 @@ classdef mDLGPop <handle
                     if xD<mP-o/2 %if in left set
                         lcount = lcount+1;
                         xL(:,lcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                        yL(lcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                        yL(:,lcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                         iL(lcount) = i;
                     elseif xD >= mP-o/2 && xD <= mP+o/2 %if in overlapping
                         pL = 0.5 + (xD-mP)/(o);
                         if pL>=rand() %select left side
                             lcount = lcount+1;
                             xL(:,lcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                            yL(lcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                            yL(:,lcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                             iL(lcount) = i;
                         else
                             rcount = rcount + 1;
                             xR(:,rcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                            yR(rcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                            yR(:,rcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                             iR(rcount) = i;
                         end
                     elseif xD>mP+o/2 %if in right
                         rcount = rcount + 1;
                         xR(:,rcount) = obj.X(:,(obj.auxUbic(model)-1)*obj.pts+i);
-                        yR(rcount) = obj.Y((obj.auxUbic(model)-1)*obj.pts+i);
+                        yR(:,rcount) = obj.Y(:,(obj.auxUbic(model)-1)*obj.pts+i);
                         iR(rcount) = i;
                     end
                 end
@@ -339,8 +347,8 @@ classdef mDLGPop <handle
                     obj.alpha(:,[obj.auxUbic(model),obj.auxUbic(obj.count+1)]) = ...
                         obj.alpha(:,[obj.auxUbic(obj.count+1),obj.auxUbic(model)]);
                     %copy hyperparameters into the right model
-                    obj.sigmaF(obj.auxUbic(obj.count+1)) = obj.sigmaF(obj.auxUbic(model));
-                    obj.sigmaN(obj.auxUbic(obj.count+1)) = obj.sigmaN(obj.auxUbic(model));
+                    obj.sigmaF(:,obj.auxUbic(obj.count+1)) = obj.sigmaF(:,obj.auxUbic(model));
+                    obj.sigmaN(:,obj.auxUbic(obj.count+1)) = obj.sigmaN(:,obj.auxUbic(model));
                     obj.lengthS(:,obj.auxUbic(obj.count+1)) = obj.lengthS(:,obj.auxUbic(model));
                     %copy previous gradient and delta
                     obj.delta(:,obj.auxUbic(obj.count+1)) = obj.delta(:,obj.auxUbic(model));
@@ -351,32 +359,40 @@ classdef mDLGPop <handle
                 else %update alpha and  L values for the new models
                     B = (1:obj.pts);
                     C = [iL(1:lcount),iR(1:rcount)];
-                    newK = obj.K(1:end, (obj.auxUbic(model)-1)*obj.pts+1:...
-                        (obj.auxUbic(model)-1)*obj.pts+obj.pts);
-                    %permute K:
-                    newK(B,:) =  newK(C,:);
-                    newK(:,B) = newK(:,C);
-                    %set child Ks
-                    obj.K(1:lcount,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = newK(1:lcount,1:lcount);
-                    obj.K(1:rcount,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = newK(lcount+1:end,lcount+1:end);
-                    %set child invKs
-                    obj.invK(1:lcount,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = inv(newK(1:lcount,1:lcount));
-                    obj.invK(1:rcount,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
-                        (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = inv(newK(lcount+1:end,lcount+1:end));
-                    %compute child alphas
-                    obj.alpha(1:lcount, obj.auxUbic(obj.count)) =  newK(1:lcount,1:lcount)\yL(1:lcount)';
-                    obj.alpha(1:rcount, obj.auxUbic(obj.count+1)) = newK(lcount+1:end,lcount+1:end)\yR(1:rcount)';
+                    
+                    for i = 0:obj.outs-1
+                        newK = obj.K(i*obj.pts+1:(i+1)*obj.pts, (obj.auxUbic(model)-1)*obj.pts+1:...
+                            (obj.auxUbic(model)-1)*obj.pts+obj.pts);
+                        %permute K:
+                        newK(B,:) =  newK(C,:);
+                        newK(:,B) = newK(:,C);
+                        %set child Ks
+                        obj.K(i*obj.pts+1:i*obj.pts+lcount...
+                            ,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = newK(1:lcount,1:lcount);
+                        obj.K(i*obj.pts+1:i*obj.pts+rcount...
+                            ,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = newK(lcount+1:end,lcount+1:end);
+                        %set child invKs
+                        obj.invK(i*obj.pts+1:i*obj.pts+lcount...
+                            ,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count)-1)*obj.pts+lcount) = inv(newK(1:lcount,1:lcount));
+                        obj.invK(i*obj.pts+1:i*obj.pts+rcount...
+                            ,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
+                            (obj.auxUbic(obj.count+1)-1)*obj.pts+rcount) = inv(newK(lcount+1:end,lcount+1:end));
+                        %compute child alphas
+                        obj.alpha(i*obj.pts+1:i*obj.pts+lcount...
+                            , obj.auxUbic(obj.count)) =  newK(1:lcount,1:lcount)\yL(i+1,1:lcount)';
+                        obj.alpha(i*obj.pts+1:i*obj.pts+rcount...
+                            , obj.auxUbic(obj.count+1)) = newK(lcount+1:end,lcount+1:end)\yR(i+1,1:rcount)';
+                    end
                     %set hyperparameters for the right child, left inherits
-                    obj.sigmaF(obj.auxUbic(obj.count+1)) = obj.sigmaF(obj.auxUbic(model));
-                    obj.sigmaN(obj.auxUbic(obj.count+1)) = obj.sigmaN(obj.auxUbic(model));
+                    obj.sigmaF(:,obj.auxUbic(obj.count+1)) = obj.sigmaF(:,obj.auxUbic(model));
+                    obj.sigmaN(:,obj.auxUbic(obj.count+1)) = obj.sigmaN(:,obj.auxUbic(model));
                     obj.lengthS(:,obj.auxUbic(obj.count+1)) = obj.lengthS(:,obj.auxUbic(model));
                     %set delta and dlik0 for right child, left inherits
                     obj.delta(:,obj.auxUbic(obj.count+1)) = obj.delta(:,obj.auxUbic(model));
                     obj.dlik0(:,obj.auxUbic(obj.count+1)) = obj.dlik0(:,obj.auxUbic(model));
-                    
                     div = -1; %stop the divide loop
                     childModel = -1;
                 end
@@ -385,9 +401,9 @@ classdef mDLGPop <handle
                     (obj.auxUbic(obj.count)-1)*obj.pts+obj.pts) = xL;
                 obj.X(:, (obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
                     (obj.auxUbic(obj.count+1)-1)*obj.pts+obj.pts) = xR;
-                obj.Y((obj.auxUbic(obj.count)-1)*obj.pts+1:...
+                obj.Y(:,(obj.auxUbic(obj.count)-1)*obj.pts+1:...
                     (obj.auxUbic(obj.count)-1)*obj.pts+obj.pts) = yL;
-                obj.Y((obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
+                obj.Y(:,(obj.auxUbic(obj.count+1)-1)*obj.pts+1:...
                     (obj.auxUbic(obj.count+1)-1)*obj.pts+obj.pts) = yR;
                 obj.auxUbic(model) = 0; %parent model will not have data
             end
@@ -428,6 +444,7 @@ classdef mDLGPop <handle
         end
         
         function out = predict(obj,x)
+            out = zeros(obj.outs,1);
             moP = zeros(2,1000);% line 1: active GPs, line 2: global probability
             mCount = 1; %number of GPs used for predictions
             moP(1,1) = 1; %start in root
@@ -452,14 +469,16 @@ classdef mDLGPop <handle
                     end
                 end
             end
-            out = 0;
             %prediction: weigthing prediction with proabilities
-            for i=1:mCount
-                model = moP(1,i);
-                pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, model) )' * ...
-                    obj.alpha(1:obj.localCount(model),obj.auxUbic(model));
-                out = out+pred*moP(2,i);
+            for p = 0:obj.outs-1
+                for i=1:mCount
+                    model = moP(1,i);
+                    pred = ( obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, p+1,model) )' * ...
+                        obj.alpha(p*obj.pts+1: p*obj.pts+obj.localCount(model)...
+                        ,obj.auxUbic(model));
+                    out(p+1) = out(p+1)+pred*moP(2,i);
+                end
             end
         end
         
@@ -488,22 +507,26 @@ classdef mDLGPop <handle
                     end
                 end
             end
-            out = 0;
-            outVar = 0;
+            out = zeros(obj.outs,1);
+            outVar = zeros(obj.outs,1);
             %prediction: weigthing prediction and variance with proabilities
-            for i=1:mCount
-                model = moP(1,i);
-                kxX = obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, model);
-                pred = kxX' *obj.alpha(1:obj.localCount(model),obj.auxUbic(model));
-                
-                localVar = obj.kernel(x,x,model)- kxX'*obj.invK(1:obj.localCount(model),...
-                    (obj.auxUbic(model)-1)*obj.pts+1:(obj.auxUbic(model)-1)*...
-                    obj.pts+obj.localCount(model))*kxX;
-                outVar= outVar + (localVar+pred^2)*moP(2,i);
-                out = out+pred*moP(2,i);
+            for p = 0:obj.outs-1
+                for i=1:mCount
+                    model = moP(1,i);
+                    kxX = obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, p+1,model);
+                    pred = kxX' * obj.alpha(p*obj.pts+1: p*obj.pts+obj.localCount(model)...
+                        ,obj.auxUbic(model));
+                    out(p+1) = out(p+1)+pred*moP(2,i);
+          
+                    localVar = obj.kernel(x,x,p+1,model)- ...
+                        kxX'*obj.invK(p*obj.pts+1:p*obj.pts+obj.localCount(model),...
+                        (obj.auxUbic(model)-1)*obj.pts+1:(obj.auxUbic(model)-1)*...
+                        obj.pts+obj.localCount(model))*kxX;
+                    outVar(p+1)= outVar(p+1) + (localVar+pred^2)*moP(2,i);
+                end
+                outVar(p+1) = outVar(p+1) - out(p+1)^2;
             end
-            outVar = outVar - out^2;
         end
         
         function [out, outVar,outLik] = predictL(obj,x,yTest)
@@ -529,25 +552,31 @@ classdef mDLGPop <handle
                     end
                 end
             end
-            out = 0;
-            outVar = 0;
-            outLik = 0;
-            for i=1:mCount
-                model = moP(1,i);
-                kxX = obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
-                    (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, model);
-                pred = kxX' *obj.alpha(1:obj.localCount(model),obj.auxUbic(model));
-                
-                localVar = obj.kernel(x,x,model)- kxX'*obj.invK(1:obj.localCount(model),...
-                    (obj.auxUbic(model)-1)*obj.pts+1:(obj.auxUbic(model)-1)*...
-                    obj.pts+obj.localCount(model))*kxX;
-                outVar= outVar + (localVar+pred^2)*moP(2,i);
-                prob = normpdf(yTest,pred, sqrt(localVar + obj.sigmaN(obj.auxUbic(model))^2));
-                outLik = outLik+max(prob,1e-300)*moP(2,i);
-                out = out+pred*moP(2,i);
+            out = zeros(obj.outs,1);
+            outVar = zeros(obj.outs,1);
+            outLik = zeros(obj.outs,1);
+            for p =0:obj.outs-1
+                for i=1:mCount
+                    model = moP(1,i);
+                    
+                    kxX = obj.kernel(obj.X(:,(obj.auxUbic(model)-1)*obj.pts+1:...
+                        (obj.auxUbic(model)-1)*obj.pts+obj.localCount(model)), x, p+1,model);
+                    pred = kxX' * obj.alpha(p*obj.pts+1: p*obj.pts+obj.localCount(model)...
+                        ,obj.auxUbic(model));
+                    out(p+1) = out(p+1)+pred*moP(2,i);
+          
+                    localVar = obj.kernel(x,x,p+1,model)- ...
+                        kxX'*obj.invK(p*obj.pts+1:p*obj.pts+obj.localCount(model),...
+                        (obj.auxUbic(model)-1)*obj.pts+1:(obj.auxUbic(model)-1)*...
+                        obj.pts+obj.localCount(model))*kxX;
+                    outVar(p+1)= outVar(p+1) + (localVar+pred^2)*moP(2,i);
+
+                    prob = normpdf(yTest(p+1),pred, sqrt(localVar + obj.sigmaN(p+1,obj.auxUbic(model))^2));
+                    outLik(p+1) = outLik(p+1)+max(prob,1e-300)*moP(2,i);
+                end
+                outVar(p+1) = outVar(p+1) - out(p+1)^2;
+                outLik(p+1) = -log(outLik(p+1));
             end
-            outVar = outVar - out^2;
-            outLik = -log(outLik);
         end
     end
 end

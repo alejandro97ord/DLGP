@@ -1,6 +1,7 @@
 
 clear all;close all;%clc
 % opengl('save','software')
+select  = 3;
 datasetSelect;
 rng(0)
 inputSize =size(X_train,2);
@@ -20,15 +21,17 @@ error = zeros(amountDoF,100);
 start = strcat('Start time: ',datestr(now,'HH.MM.SS'));disp(start)
 tic
 runTime = tic;
+
 % meanTorque;
 for DoF = 1:amountDoF
     d = ['Initialized DoF: ',num2str(DoF)];
     disp(d)
-    gp01 = mDLGPopMean;
+    rng(0)
+    gp01 = mDLGPop;
     gp01.ard = 1; %1 with ARD, 0 no ARD
     gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
-    gp01.wo = 300; %overlapping factor
-    gp01.init(inputSize,50,2*50000);
+    gp01.wo = 2000; %overlapping factor
+    gp01.init(inputSize,50,4000);
     for j = 0:Nsteps-1
         ave = Ns(j+2)-Ns(j+1);
         tic;
