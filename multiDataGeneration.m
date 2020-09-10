@@ -3,8 +3,10 @@ select =3;
 datasetSelect;
 
 runTime = tic;
-gp01 = mDLGPMop;
+gp01 = mDLGPMopMean;
+gp01.ard = 1;
 
+gp01.meanFunction = {@(x)4,@(x)5,@(x)6,@(x)0,@(x)0,@(x)0,@(x) 0};
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
 gp01.wo = 2000; %overlapping factor
 
@@ -22,8 +24,8 @@ Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
 %initialize GP
 d = ['Initialized at : ',datestr(now,'HH.MM.SS')];
 disp(d)
-t_update = zeros(1,100);
-t_pred = zeros(1,100);
+t_update = zeros(1,Nsteps);
+t_pred = zeros(1,Nsteps);
 output = zeros(size(Y_train,2),4449);
 outvar = zeros(size(Y_train,2),4449);
 negll = zeros(size(Y_train,2),4449);
@@ -54,6 +56,7 @@ disp(mean(outvar,2)');
 disp(mean(negll,2)');
 d = ['Finalized at: ',datestr(now,'HH.MM.SS')];
 disp(d)
+save('oB','error','t_pred','t_update','Ns','runTime','negll')
 %%
 
 res.K = gp01.K;

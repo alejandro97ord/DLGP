@@ -159,7 +159,6 @@ classdef mDLGPop <handle
                 + (obj.dlik0(:,obj.auxUbic(model)).*dfx1==0).*...
                 obj.delta(:,obj.auxUbic(model));
             d1 = d1.*(d1>=dmin & d1 <= dmax)+(d1<dmin)*dmin + (d1>dmax)*dmax;
-            %             dfx1 = ((obj.dlik0(:,obj.auxUbic(model)).*dfx1)>=0).*dfx1;
             %update properties
             obj.dlik0(:,obj.auxUbic(model)) = dfx1;
             obj.delta(:,obj.auxUbic(model)) = d1;

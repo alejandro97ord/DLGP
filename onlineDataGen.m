@@ -8,16 +8,16 @@ inputSize =size(X_train,2);
 amountDoF = size(Y_train,2);
 
 Nsteps = 100;
-Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
+Ns = round([1,linspace(Nsteps,size(X_train,1),Nsteps)]);
 
 output = zeros(1,size(X_test,1));
 outvar = zeros(1,size(X_test,1));
 negll = zeros(1,size(X_test,1));
-Nll = zeros(amountDoF,100);
-oVar= zeros(amountDoF,100);
-t_update = zeros(amountDoF,100);
-t_pred = zeros(amountDoF,100);
-error = zeros(amountDoF,100);
+Nll = zeros(amountDoF,Nsteps);
+oVar= zeros(amountDoF,Nsteps);
+t_update = zeros(amountDoF,Nsteps);
+t_pred = zeros(amountDoF,Nsteps);
+error = zeros(amountDoF,Nsteps);
 start = strcat('Start time: ',datestr(now,'HH.MM.SS'));disp(start)
 tic
 runTime = tic;
@@ -41,9 +41,9 @@ for DoF = 1:amountDoF
         t_update(DoF,j+1) = toc/ave;
         tic;
         for d = 1: size(X_test,1)
-%             output(d)=gp01.predict(X_test(d,:)');
+            output(d)=gp01.predict(X_test(d,:)');
 %             [output(d),outvar(d)]=gp01.predictV(X_test(d,:)');
-            [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
+%             [output(d),outvar(d),negll(d)]=gp01.predictL(X_test(d,:)',Y_test(d,DoF));
         end
         oVar(DoF,j+1) = mean(outvar);
         Nll(DoF,j+1) = mean(negll);
@@ -61,7 +61,9 @@ saveFile = strcat('testResults/',fileName,datestr(now,'mmm.dd_HH.MM.SS'),'oo.mat
 specs.pts = gp01.pts; specs.N = gp01.N; specs.divM = gp01.divMethod;
 specs.wo = gp01.wo;%specs.oEffect = oEff;
 
-save(saveFile,'error','t_pred','t_update','Ns','specs','runTime','Nll','oVar')
+save('mB','error','t_pred','t_update','Ns','specs','runTime','Nll','oVar')
+save(saveFile)
+% save(saveFile,'error','t_pred','t_update','Ns','specs','runTime','Nll','oVar')
 %%
 DoF = size(error,1);
 figure(1)

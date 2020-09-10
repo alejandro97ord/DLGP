@@ -52,6 +52,7 @@ classdef mDLGPMop <handle
         sigmaN ; %sigma_N
         dlik0; %previous gradient
         delta; %previous delta from Rprop
+        amountL; %if ard xSize else 1
     end
     
     methods
@@ -86,16 +87,18 @@ classdef mDLGPMop <handle
                 obj.lengthS = ones(obj.xSize*obj.outs,obj.N);
                 obj.delta = 0.1*ones((obj.xSize+2)*obj.outs,obj.N);
                 obj.dlik0 = ones((obj.xSize+2)*obj.outs,obj.N);
+                obj.amountL = obj.xSize;
             else
                 obj.lengthS = ones(obj.outs,obj.N);
                 obj.delta = 0.1*ones(3*obj.outs,obj.N);
                 obj.dlik0 = ones(3*obj.outs,obj.N);
+                obj.amountL = 1;
             end
         end
         
         function kern = kernel(obj, Xi, Xj,out, model)%squared exponential kernel
             kern = (obj.sigmaF(out,obj.auxUbic(model))^2)*...
-                exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS((out-1)*obj.xSize+1:out*obj.xSize,obj.auxUbic(model)).^2),1))';
+                exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS((out-1)*obj.amountL+1:out*obj.amountL,obj.auxUbic(model)).^2),1))';
         end
         
         function kern = fkernel(~,Xi,hyp) %kernel of Xi and itself (square matrix)
@@ -138,13 +141,13 @@ classdef mDLGPMop <handle
                 % get the previous hyperparameters
                 x0 = [obj.sigmaF(p+1,obj.auxUbic(model));...
                     obj.sigmaN(p+1,obj.auxUbic(model));...
-                    obj.lengthS(p*obj.xSize+1:(p+1)*obj.xSize,obj.auxUbic(model))];
+                    obj.lengthS(p*obj.amountL+1:(p+1)*obj.amountL,obj.auxUbic(model))];
 
                 dmax = 50; dmin = 1e-6; etap = 1.2; etam = 0.5;
 
                 %get new hyperparameters
-                x1  = x0 + sign (obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model))).*...
-                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model));
+                x1  = x0 + sign (obj.dlik0(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model))).*...
+                    obj.delta(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model));
                 if abs(x1(2))<0.01
                     x1(2) = sign(x1(2))*0.01;
                 end
@@ -153,20 +156,20 @@ classdef mDLGPMop <handle
                 end
                 dfx1 = obj.grad(x1,model,p);
                 %update delta and check it fullfils requirements
-                d1 = ((obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)).*dfx1)>0).*...
-                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model))*etap...
-                    + ((obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)).*dfx1)<0).*...
-                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model))*etam ...
-                    + (obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)).*dfx1==0).*...
-                    obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model));
+                d1 = ((obj.dlik0(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model)).*dfx1)>0).*...
+                    obj.delta(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model))*etap...
+                    + ((obj.dlik0(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model)).*dfx1)<0).*...
+                    obj.delta(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model))*etam ...
+                    + (obj.dlik0(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model)).*dfx1==0).*...
+                    obj.delta(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model));
                 d1 = d1.*(d1>=dmin & d1 <= dmax)+(d1<dmin)*dmin + (d1>dmax)*dmax;
                 %             dfx1 = ((obj.dlik0(:,obj.auxUbic(model)).*dfx1)>=0).*dfx1;
                 %update properties
-                obj.dlik0(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)) = dfx1;
-                obj.delta(p*(obj.xSize+2)+1:(p+1)*(obj.xSize+2),obj.auxUbic(model)) = d1;
+                obj.dlik0(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model)) = dfx1;
+                obj.delta(p*(obj.amountL+2)+1:(p+1)*(obj.amountL+2),obj.auxUbic(model)) = d1;
                 obj.sigmaF(p+1,obj.auxUbic(model)) = x1(1);
                 obj.sigmaN(p+1,obj.auxUbic(model)) = x1(2);
-                obj.lengthS(p*obj.xSize+1:(p+1)*obj.xSize,obj.auxUbic(model)) = x1(3:end);
+                obj.lengthS(p*obj.amountL+1:(p+1)*obj.amountL,obj.auxUbic(model)) = x1(3:end);
             end
         end
         
