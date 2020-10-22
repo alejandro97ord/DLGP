@@ -1,0 +1,25 @@
+Changes for the code (e.g. DLGP_IE) to work on Simulink 2017a
+Remove "matlab.system.mixin.SampleTime" from line 1
+Remove the "getSampleTimeImpl" method
+
+
+Changes for Simulink 
+from CG_IE to IE
+The CG_IE needs a kernel based on fors, e.g.
+
+        function kern = kernel(obj, Xi, Xj)
+            kern = zeros(size(Xi,2), 1);
+            for i=1:size(Xi,2)
+                kern(i) = obj.sigmaF.^2 .*...
+                    exp(-0.5 .* sum((Xi(:,i)-Xj).^2 ...
+                    ./ obj.lengthS.^2 ));
+            end
+        end
+
+The IE uses a kernel based on vector operations
+
+        function kern = kernel(obj, Xi, Xj)
+            kern = (obj.sigmaF^2)*exp(-0.5*sum(((Xi-Xj).^2)./(obj.lengthS.^2),1))';
+        end
+
+(CG cannot work with vector operations kernel)

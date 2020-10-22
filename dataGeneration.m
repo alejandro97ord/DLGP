@@ -3,7 +3,7 @@ tic
 gp01 = mDLGP;
 
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
-gp01.wo = 300; %overlapping factor
+gp01.wo = 2000; %overlapping factor
 
 %data loaded from hyp.
 gp01.sigmaF = sigf(DoF); 

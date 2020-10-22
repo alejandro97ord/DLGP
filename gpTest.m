@@ -7,7 +7,7 @@ datasetSelect;
 inputSize =size(X_train,2);
 amountDoF = size(Y_train,2);
 
-Nsteps = 100;
+Nsteps = 1;
 Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
 
 output = zeros(1,size(X_test,1));

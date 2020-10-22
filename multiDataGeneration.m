@@ -3,22 +3,24 @@ select =3;
 datasetSelect;
 
 runTime = tic;
-gp01 = mDLGPMopMean;
+gp01 = mDLGPM_Mean;
 gp01.ard = 1;
 
-gp01.meanFunction = {@(x)4,@(x)5,@(x)6,@(x)0,@(x)0,@(x)0,@(x) 0};
+gp01.sigmaN = sign';
+gp01.sigmaF = sigf';
+gp01.lengthS = ls(1:end)';
+
+gp01.meanFunction = {@(x)6,@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
 gp01.wo = 2000; %overlapping factor
 
-Y_train = Y_train(:,1:7);
-Y_test = Y_test(:,1:7);
 %data loaded from hyp.
 % gp01.sigmaF = sigf; 
 % gp01.sigmaN = sign;
 % gp01.lengthS = ls;
 gp01.outs = size(Y_train,2);
 
-gp01.init(size(X_train,2),50,4000);
+gp01.init(size(X_train,2),50,10000);
 Nsteps = 1;
 Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
 %initialize GP
@@ -40,9 +42,9 @@ for j = 0:Nsteps-1
     
     tic;
     for d = 1: size(X_test,1)
-%         output(:,d)=gp01.predict(X_test(d,:)');
+        output(:,d)=gp01.predict(X_test(d,:)');
 %         [output(:,d),outvar(:,d)]=gp01.predictV(X_test(d,:)');
-        [output(:,d),outvar(:,d),negll(:,d)]=gp01.predictL(X_test(d,:)',Y_test(d,:));
+%         [output(:,d),outvar(:,d),negll(:,d)]=gp01.predictL(X_test(d,:)',Y_test(d,:));
     end
 %     oVar(DoF,j+1) = mean(outvar);
 %     Nll(DoF,j+1) = mean(negll);
@@ -54,9 +56,9 @@ error = output' - Y_test;
 disp(mean(error.^2)./var(Y_test));
 disp(mean(outvar,2)');
 disp(mean(negll,2)');
-d = ['Finalized at: ',datestr(now,'HH.MM.SS')];
-disp(d)
-save('oB','error','t_pred','t_update','Ns','runTime','negll')
+msg = ['Finalized at: ',datestr(now,'HH.MM.SS')];
+disp(msg)
+% save('oB','error','t_pred','t_update','Ns','runTime','negll')
 %%
 
 res.K = gp01.K;
