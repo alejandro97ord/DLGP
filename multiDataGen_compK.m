@@ -12,8 +12,11 @@ gp01.lengthSf = ls(1:end)';
 gp01.sigmaFg = sigf';
 gp01.lengthSg = ls(1:end)';
 
-gp01.meanFunctionf = {@(x)5,@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
-gp01.meanFunctiong = {@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
+gp01.meanFunctionf = {@(x)x(1,:),@(x)0,@(x)0,@(x)x(3,:),@(x)0,@(x)0,@(x) 0};
+gp01.meanFunctiong = {@(x)0,@(x)x(2,:),@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
+gp01.meanFunctionfh = {@(x)5,@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
+gp01.meanFunctiongh= {@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
+
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
 gp01.wo = 2000; %overlapping factor
 
