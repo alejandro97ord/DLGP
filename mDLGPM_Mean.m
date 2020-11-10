@@ -126,8 +126,8 @@ classdef mDLGPM_Mean <handle
                     lH = chol(obj.kernel(x, x, p+1) + obj.sigmaN(p+1).^2);
                     obj.K(p*obj.pts+1,(pos)*obj.pts+1) = obj.kernel(x, x, p+1) + obj.sigmaN(p+1).^2;
                     obj.L(p*obj.pts+1,(pos)*obj.pts+1) = lH;
-                    obj.alpha(p*obj.pts+1,pos+1) = lH'\(lH\(obj.Y((pos)*obj.pts+1)- obj.meanFunction{p+1}(x)));
-                    obj.auxAlpha(p*obj.pts+1,pos+1) = lH\(obj.Y((pos)*obj.pts+1)- obj.meanFunction{p+1}(x));
+                    obj.alpha(p*obj.pts+1,pos+1) = lH'\(lH\(obj.Y(p+1,(pos)*obj.pts+1)- obj.meanFunction{p+1}(x)));
+                    obj.auxAlpha(p*obj.pts+1,pos+1) = lH\(obj.Y(p+1,(pos)*obj.pts+1)- obj.meanFunction{p+1}(x));
                 end
             else
                 %set the updated parameters
