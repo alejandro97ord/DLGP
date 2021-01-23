@@ -54,7 +54,6 @@ def hypOp(amountPts, iterations, x, y):
             loss.backward()
 
             optimizer.step()
-        print(training_iter)
         print('DoF %d Iter %d/%d - Loss: %.3f   OutputScale: %.3f   noise: %.3f' % (
                 p,i + 1, training_iter, loss.item(),
                 model.covar_module.outputscale.item()**0.5,

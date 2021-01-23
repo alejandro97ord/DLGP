@@ -5,9 +5,10 @@ import time
 from scipy.io import loadmat
 import numpy as np
 import random
+from math import log
 
 print("Select")
-select = 3#int(input())
+select = 1#int(input())
 
 
 if select == 1:                
@@ -46,7 +47,7 @@ if Y_train.ndim == 1:
 gp01 = dlgp(ins,outs,50,50000,True)  
 
 ptsHyp = 800 #points used for hyperparameter optimization
-hypOp( ptsHyp , 100 , X_train[:,0:ptsHyp] , Y_train[:, 0:ptsHyp]) #dataset, pts, iterations
+hypOp( ptsHyp , 1000 , X_train[:,0:ptsHyp] , Y_train[:, 0:ptsHyp]) #dataset, pts, iterations
 
 hyps = loadmat("hyps.mat")
 gp01.sigmaF = hyps['sf']
@@ -55,13 +56,17 @@ gp01.lengthS = hyps['L']
 
 gp01.wo = 300
 
+#train first points
+for k in range(ptsHyp):
+    gp01.update(X_train[:,k], Y_train[:,k])
+
 
 output = np.zeros( [outs , X_train.shape[1]] , dtype = float) 
 error = np.zeros( [outs , X_train.shape[1]] , dtype = float)
 
-print("Test starts:")
+print("Starting test:")
 a = time.time()
-for j in range(X_train.shape[1]):
+for j in range(ptsHyp,X_train.shape[1]):
     if j%1000 == 0:
         print(j)
     output[ : , j ] = gp01.predict( X_train[:,j] )
@@ -70,7 +75,7 @@ for j in range(X_train.shape[1]):
     
     error[ : , j ] = ( (output[ : , j ] - Y_train[ : , j ] ) ** 2 ) / Y_train.var()
     
-
+#cumulative error
 error = np.cumsum(error, axis = 1) / (np.array( range(Y_train.shape[1]) ) + 1 )
 
 b = time.time()  
