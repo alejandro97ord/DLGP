@@ -7,7 +7,7 @@ import numpy as np
 import random
 
 print("Select")
-select = 1#int(input())
+select = 3#int(input())
 
 
 if select == 1:                
@@ -34,33 +34,36 @@ if select == 3 :
     X_train = np.delete(X_train,5, axis = 0)
 
 #determine number of ouputs
+ins = X_train.shape[0]
 outs = Y_train.shape[0]
 if Y_train.ndim == 1:
     outs = 1
     Y_train = np.reshape(Y_train,[1, Y_train.shape[0]])
     
 #initialize DLGP
-gp01 = dlgp(77,outs,50,50000,True)   #(xDimensionality , outputs , pts , max. number of leaves , ard)
+
+ #(xDimensionality , outputs , pts , max. number of leaves , ard)
+gp01 = dlgp(ins,outs,50,50000,True)  
 
 ptsHyp = 800 #points used for hyperparameter optimization
 hypOp( ptsHyp , 100 , X_train[:,0:ptsHyp] , Y_train[:, 0:ptsHyp]) #dataset, pts, iterations
 
 hyps = loadmat("hyps.mat")
-gp01.sigmaF = hyps['sf'][0,:]
-gp01.sigmaN = hyps['sn'][0,:]
+gp01.sigmaF = hyps['sf']
+gp01.sigmaN = hyps['sn']
 gp01.lengthS = hyps['L']
 
 gp01.wo = 300
 
-print("press")
-int(input())
-
 
 output = np.zeros( [outs , X_train.shape[1]] , dtype = float) 
 error = np.zeros( [outs , X_train.shape[1]] , dtype = float)
-int(input())
+
+print("Test starts:")
 a = time.time()
 for j in range(X_train.shape[1]):
+    if j%1000 == 0:
+        print(j)
     output[ : , j ] = gp01.predict( X_train[:,j] )
     
     gp01.update(X_train[:,j], Y_train[:,j])
@@ -74,6 +77,7 @@ b = time.time()
 
 c = time.time()
 print(c-a)
+print(error[:,-1])
 # DLGP without ARD is still not supported
 # total time with no aho is ca. 39 s
 # agregar aho opcional , ard , mean function , composite kernel , 
