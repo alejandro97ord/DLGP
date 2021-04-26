@@ -3,8 +3,14 @@ select =3;
 datasetSelect;
 
 runTime = tic;
-gp01 = mDLGPM_Mean;
+sl = input('0 or 1');
+if sl == 0
+    gp01 = mDLGPM_Mean0;
+else 
+    gp01= mDLGPM_Mean;
+end
 gp01.ard = 1;
+% gp01.kNum = 2;
 
 gp01.sigmaN = sign';
 gp01.sigmaF = sigf';
@@ -12,7 +18,7 @@ gp01.lengthS = ls(1:end)';
 
 gp01.meanFunction = {@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x)0,@(x) 0};
 gp01.divMethod  = 3; %1: median, 2: mean, 3: mean(max, min)
-gp01.wo = 30000; %overlapping factor
+gp01.wo = 100000; %overlapping factor
 
 %data loaded from hyp.
 % gp01.sigmaF = sigf; 
@@ -61,14 +67,14 @@ disp(msg)
 % save('oB','error','t_pred','t_update','Ns','runTime','negll')
 %%
 
-res.K = gp01.K;
-res.X = gp01.X;
-res.Y = gp01.Y;
-res.alpha = gp01.alpha;
-res.invK = gp01.invK;
-res.sigmaN = gp01.sigmaN;
-res.lengthS = gp01.lengthS;
-res.sigmaF = gp01.sigmaF;
-res.dlik0 = gp01.dlik0;
-res.delta = gp01.delta;
+% res.K = gp01.K;
+% res.X = gp01.X;
+% res.Y = gp01.Y;
+% res.alpha = gp01.alpha;
+% res.invK = gp01.invK;
+% res.sigmaN = gp01.sigmaN;
+% res.lengthS = gp01.lengthS;
+% res.sigmaF = gp01.sigmaF;
+% res.dlik0 = gp01.dlik0;
+% res.delta = gp01.delta;
 

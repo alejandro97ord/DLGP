@@ -8,7 +8,7 @@ import random
 from math import log
 
 print("Select")
-select = 1#int(input())
+select = 2#int(input())
 
 
 if select == 1:                
@@ -46,9 +46,10 @@ if Y_train.ndim == 1:
  #(xDimensionality , outputs , pts , max. number of leaves , ard)
 gp01 = dlgp(ins,outs,50,50000,True)  
 
-ptsHyp = 800 #points used for hyperparameter optimization
-hypOp( ptsHyp , 1000 , X_train[:,0:ptsHyp] , Y_train[:, 0:ptsHyp]) #dataset, pts, iterations
-
+ptsHyp = 801 #points used for hyperparameter optimization
+hypOp( ptsHyp , 100 , X_train[:,0:ptsHyp] , Y_train[:, 0:ptsHyp]) #dataset, pts, iterations
+print("Press enter to continue")
+input()
 hyps = loadmat("hyps.mat")
 gp01.sigmaF = hyps['sf']
 gp01.sigmaN = hyps['sn']
@@ -57,6 +58,7 @@ gp01.lengthS = hyps['L']
 gp01.wo = 300
 
 #train first points
+print("Initial training")
 for k in range(ptsHyp):
     gp01.update(X_train[:,k], Y_train[:,k])
 

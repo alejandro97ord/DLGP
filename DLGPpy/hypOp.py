@@ -10,8 +10,8 @@ def hypOp(amountPts, iterations, x, y):
     y0 = y.transpose()
     ins = x.shape[1]
     outs = y.shape[0]
-    x = torch.from_numpy(x)
     for p in range(outs):
+        x = torch.from_numpy(x)
         y = torch.from_numpy(y0[:,p])
         class ExactGPModel(gpytorch.models.ExactGP):
             def __init__(self, train_x, train_y, likelihood):
