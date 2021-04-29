@@ -246,24 +246,27 @@ classdef mDLGPM_Mean <handle
 
                 %update alpha and  L values for the new models
                 B = (1:obj.pts);
-                C = nonzeros(distIndex(1:end));
-                parentX = obj.X(:,chAuxU(1):chAuxU(1)+obj.pts-1);
-                parentY = obj.Y(:,chAuxU(1):chAuxU(1)+obj.pts-1);
+                C = nonzeros(distIndex(1:end))';
+                parentX = obj.X(:,(chAuxU(1)-1)*obj.pts+1: (chAuxU(1)-1)*obj.pts+obj.pts);
+                parentY = obj.Y(:,(chAuxU(1)-1)*obj.pts+1: (chAuxU(1)-1)*obj.pts+obj.pts);
                 for i = 0:obj.outs-1
                     newK = obj.K(i*obj.pts+1:(i+1)*obj.pts, (obj.auxUbic(model)-1)*obj.pts+1:...
                         (obj.auxUbic(model)-1)*obj.pts+obj.pts);
                     %permute K:
                     newK(B,:) =  newK(C,:);
                     newK(:,B) = newK(:,C);
-                    %sort child data
-                    
+
                     %set child Ks
                     auxPos = 1; %determines where each child K is
                     for j = 1 :obj.kNum
-                        obj.X(:,(chAuxU(j)-1)*obj.pts+1:(chAuxU(j)-1)*obj.pts+distCount(j)) = ...
-                            parentX(:,distIndex(1:distCount(j), j));
+                        
+                        %sort child data
+                        
+                        obj.X(:,(chAuxU(j)-1)*obj.pts+1:(chAuxU(j)-1)*obj.pts+obj.pts) = ...
+                            [parentX(:,distIndex(1:distCount(j), j)) zeros(obj.xSize,obj.pts-distCount(j))];
                         obj.Y(:,(chAuxU(j)-1)*obj.pts+1:(chAuxU(j)-1)*obj.pts+distCount(j)) = ...
                             parentY(:,distIndex(1:distCount(j), j));
+                        
                         
                         localK = newK(auxPos:auxPos + distCount(j)-1,auxPos:auxPos + distCount(j)-1);
                         obj.K(i*obj.pts+1:i*obj.pts+distCount(j)...
