@@ -23,7 +23,7 @@ gp01.wo = 100; %overlapping factor
 % gp01.lengthS = ls;
 gp01.outs = size(Y_train,2);
 
-gp01.init(size(X_train,2),50,5000);
+gp01.init(size(X_train,2),100,5000);
 Nsteps = 1;
 Ns = round([1,linspace(100,size(X_train,1),Nsteps)]);
 %initialize GP

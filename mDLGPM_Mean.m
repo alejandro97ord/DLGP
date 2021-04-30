@@ -262,8 +262,8 @@ classdef mDLGPM_Mean <handle
                         
                         %sort child data
                         
-                        obj.X(:,(chAuxU(j)-1)*obj.pts+1:(chAuxU(j)-1)*obj.pts+obj.pts) = ...
-                            [parentX(:,distIndex(1:distCount(j), j)) zeros(obj.xSize,obj.pts-distCount(j))];
+                        obj.X(:,(chAuxU(j)-1)*obj.pts+1:(chAuxU(j)-1)*obj.pts+distCount(j)) = ...
+                            parentX(:,distIndex(1:distCount(j), j));
                         obj.Y(:,(chAuxU(j)-1)*obj.pts+1:(chAuxU(j)-1)*obj.pts+distCount(j)) = ...
                             parentY(:,distIndex(1:distCount(j), j));
                         
