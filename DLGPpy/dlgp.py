@@ -11,13 +11,13 @@ class dlgp:
         self.outs = outs #dimensionality of Y
         #parameters
         self.wo = 300 #factor width / overlapping
-        self.sigmaF = np.zeros(xSize , dtype = float )
-        self.sigmaN = np.zeros(xSize , dtype = float)
+        self.sigmaF = np.ones(outs , dtype = float )
+        self.sigmaN = np.ones(outs , dtype = float)
         if ard:
-            self.lengthS = np.zeros([xSize,  outs ] ,dtype = float)
+            self.lengthS = np.ones([xSize,  outs ] ,dtype = float)
             self.amountL = xSize
         else:
-            self.lengthS = 0
+            self.lengthS = 1
             self.amountL = 1
         #data
         self.X = np.zeros( [xSize , pts * N] , dtype = float )

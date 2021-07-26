@@ -46,7 +46,6 @@ classdef mDLGPM_Mean <handle
         K; %covariance matrices
         alpha; %K\y
         L;
-        auxAlpha;
         
         medians; %vector of hyperplanes
         parent; %vector of parent model
@@ -69,7 +68,6 @@ classdef mDLGPM_Mean <handle
             obj.Y = zeros(obj.outs, obj.pts * obj.N);
             obj.K = zeros(obj.pts*obj.outs, obj.pts * obj.N);
             obj.alpha = zeros(obj.pts*obj.outs,obj.N);
-            obj.auxAlpha = zeros(obj.pts*obj.outs,obj.N);
             obj.L =zeros(obj.pts*obj.outs,obj.pts*obj.N);
             obj.localCount = zeros(1,2* obj.N -1);
             
@@ -133,9 +131,7 @@ classdef mDLGPM_Mean <handle
                 for p = 0:obj.outs-1
                     lH = chol(obj.kernel(x, x, p+1) + obj.sigmaN(p+1).^2);
                     obj.K(p*obj.pts+1,(pos)*obj.pts+1) = obj.kernel(x, x, p+1) + obj.sigmaN(p+1).^2;
-                    obj.L(p*obj.pts+1,(pos)*obj.pts+1) = lH;
                     obj.alpha(p*obj.pts+1,pos+1) = lH'\(lH\(obj.Y(p+1,(pos)*obj.pts+1)- obj.meanFunction{p+1}(x)));
-                    obj.auxAlpha(p*obj.pts+1,pos+1) = lH\(obj.Y(p+1,(pos)*obj.pts+1)- obj.meanFunction{p+1}(x));
                 end
             else
                 %set the updated parameters
