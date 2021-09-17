@@ -11,11 +11,17 @@ class dlgp:
         self.outs = outs #dimensionality of Y
         #parameters
         self.wo = 300 #factor width / overlapping
-        self.sigmaF = np.ones(outs , dtype = float )
-        self.sigmaN = np.ones(outs , dtype = float)
+        
+        #auto. hyp. optimization
+        self.sigmaF = np.ones([outs, N] , dtype = float)
+        self.sigmaN = np.ones([outs, N] , dtype = float)
+        
         if ard:
-            self.lengthS = np.ones([xSize,  outs ] ,dtype = float)
+            self.lengthS = np.ones([xSize * outs , N ] ,dtype = float)
             self.amountL = xSize
+            #hyperparameter optimization variables
+            self.dlik0 = 0.1 * np.ones([(xSize + 2) * outs, N], dtype = float) #local gradients
+            self.delta = np.ones([(xSize + 2) * outs, N], dtype = float) #local stepsize
         else:
             self.lengthS = 1
             self.amountL = 1
@@ -33,15 +39,73 @@ class dlgp:
         self.auxUbic = np.zeros( 2 * N - 1 , dtype = int ) - 1 #map the position of data
         self.auxUbic[0] = 0
         self.children = np.zeros( [2, 2 * N - 1] , dtype = int) -1 #line 1: left child, line 2: right child
+
         
-    def kernel(self, Xi, Xj, out):
+    def kernel(self, Xi, Xj, out): #returns a scalar or a vector
         if Xi.ndim == 1:
             kern =  (self.sigmaF[out]**2) * np.exp( -0.5* np.sum(((Xi - Xj)/self.lengthS[:,out])**2)) 
             return kern
         else:
             kern = (self.sigmaF[out]**2) * np.exp(-0.5*np.sum(((Xi.transpose() - Xj)/self.lengthS[:,out])**2, axis = 1))
             return kern
+        
+    def fkernel(Xi, hyp): #returns a kernel matrix of Xi and itself
+    #hyp is [sigmaN, sigmaN, sigmaL_1, sigmaL_2, ... , sigmaL_xSize]
+        kern = np.zeros( [ Xi.shape[1] , Xi.shape[1] ], dtype = float)
+        if hyp.shape[0] > 3:
+            for p in range (hyp.shape[0] - 2):
+                k1, _ = np.meshgrid(Xi[p, :], Xi[p, :])
+                print(p)
+                kern = (kern + ( k1 - np.transpose(k1) )**2 ) / (hyp[p+1]**2)
+        else:
+            for p in range(Xi.shape[0]):
+                k1, _ = np.meshgrid(Xi[p, :], Xi[p, :])
+                print(k1)
+                kern = (kern + ( k1 - np.transpose(k1) )**2 ) / (hyp[2]**2)
+        kern = (hyp[0]**2) * np.e ** (-0.5 * kern)
+        return kern
     
+    def rprop(self, model):
+        for p in range(self.outs):
+            #get previous hyperparameters
+            x0 = np.append( self.sigmaF[p+1 , self.auxUbic[model] ] ,   \
+                           self.sigmaF[p+1 , self.auxUbic[model] ] , \
+                               self.lengthS[ p * self.amountL + 1 : (p+1) * self.amountL , \
+                                            self.auxUbic[model]])
+            dmax = 50
+            dmin = 1e-6
+            etap = 1.2
+            etam = 0.5
+            #get new hyperparameters
+            x1 = x0 + np.sign( self.dlik0[ p*(self.amountL+2) + 1 : \
+                        (p+1)*(self.amountL+2) , self.auxUbic[model]  ] * \
+                              self.delta[ p*(self.amountL+2)+1:\
+                                    (p+1)*(self.amountL+2),self.auxUbic[model]])
+            #sigmaN and sigmaF value restricions
+            if abs(x1[1])  < 0.01:
+                x1[1] = np.sign(x1[1])*.01
+            if np.abs(x1[0] / x1[1]) > 1000:
+                x1[0] = np.sign(x1[0]) * x1[1] * 1000
+            #get the gradient    
+            dfx1 = self.grad(x1, model, p)
+            #update delta and check if it fulfills requirements
+            dfx01 = self.dlik0[p*(self.amountL+2)+1 : (p+1)*(self.amountL+2),\
+                self.auxUbic[model]]*dfx1 #product of gradients
+            delta0 = self.delta[ p*(self.amountL+2)+1 : (p+1)*(self.amountL+2) \
+                ,self.auxUbic[model]] #previous delta
+            d1 = (dfx01>0)*delta0*etap + (dfx01<0)*delta0*etam + (dfx01==0)*delta0*etap
+            d1 = d1*(d1>=dmin & d1<=dmax) + (d1<dmin)*dmin + (d1>dmax)*dmax
+            
+            #update properties
+            self.dlik0[p*(self.amountL+2)+1 : (p+1)*(self.amountL+2),\
+                self.auxUbic[model]] = dfx1
+            self.delta[ p*(self.amountL+2)+1 : (p+1)*(self.amountL+2) \
+                ,self.auxUbic[model]] = d1
+            self.sigmaF[p+1, self.auxUbic[model]] = x1[0]
+            self.sigmaN[p+1, self.auxUbic[model]] = x1[1]
+            self.lengthS[p*self.amountL+1:(p+1)*self.amountL, self.auxUbic[model]]=\
+                x1[2:]
+                
     def updateParam(self, x, model):
         self.localCount[model] += 1
         pos = self.auxUbic[model]

@@ -75,13 +75,12 @@ print("Starting test:")
 a = time.time()
 #for j in range(ptsHyp,X_train.shape[1]):
 for j in range(X_train.shape[1]):
+    #output[ : , j ] = gp01.predict( X_train[:,j] )
+    gp01.update(X_train[:,j], Y_train[:,j])
     if j%1000 == 0:
         print(j)
-    #output[ : , j ] = gp01.predict( X_train[:,j] )
-    
-    gp01.update(X_train[:,j], Y_train[:,j])
 a0 = gp01.alpha[:,0:5000]
-    
+     
 for k in range(X_test.shape[1]):
     output[:,k] = gp01.predict(X_test[:,k])
 error = (output - Y_test ) ** 2
